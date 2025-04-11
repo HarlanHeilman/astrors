@@ -39,6 +39,7 @@ enum BufferTypes {
     Vector(ColumnArrayBuffer),
 }
 
+#[allow(unused)]
 pub struct Buffer {
     tform: String,
     size: i32,

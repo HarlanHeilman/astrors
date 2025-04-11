@@ -85,6 +85,22 @@ pub fn read_table_bytes_to_df(
     file: &mut File,
 ) -> Result<DataFrame, std::io::Error> {
     let nrows = header["NAXIS2"].value.as_int().unwrap_or(0);
+
+    // Early return for empty tables to avoid division by zero
+    if nrows == 0 {
+        let empty_df = DataFrame::new(
+            columns
+                .iter()
+                .map(|column| {
+                    polars::prelude::Column::new(column.ttype.clone().into(), column.tform.clone())
+                })
+                .collect(),
+        )
+        .unwrap();
+
+        return Ok(empty_df);
+    }
+
     let mut n_chunks: u16 = 1;
     let mut n_threads: u16 = num_cpus::get() as u16;
 
@@ -162,6 +178,23 @@ pub fn read_table_bytes_to_df(
             .collect()
     });
     drop(buffer);
+
+    // Handle the case where results might be empty (for empty tables)
+    if results.is_empty() {
+        // Create an empty dataframe with the correct schema
+        let empty_df = DataFrame::new(
+            columns
+                .iter()
+                .map(|column| {
+                    polars::prelude::Column::new(column.ttype.clone().into(), column.tform.clone())
+                })
+                .collect(),
+        )
+        .unwrap();
+
+        pad_read_buffer_to_fits_block(file, buffer_size)?;
+        return Ok(empty_df);
+    }
 
     let mut final_df = results[0].as_ref().unwrap().clone();
     for i in 1..results.len() {
